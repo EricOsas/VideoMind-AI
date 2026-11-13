@@ -71,3 +71,11 @@ def download(job_id:str):
  p=OUTPUTS/job_id/'reconstructed-project.zip'
  if not p.exists():raise HTTPException(404,'Archive not found')
  return FileResponse(p,media_type='application/zip',filename='VideoMind-Reconstructed-Project.zip')
+
+@app.get('/jobs/{job_id}/result')
+def result(job_id:str):
+ data=read_job(job_id)
+ if data.get('status')!='completed':raise HTTPException(409,'Project not ready')
+ p=JOBS/job_id/'result.json'
+ if not p.exists():raise HTTPException(404,'Result missing')
+ return json.loads(p.read_text(encoding='utf-8'))
