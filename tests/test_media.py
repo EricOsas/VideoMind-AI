@@ -29,6 +29,14 @@ def test_download_youtube_enables_available_js_runtime(tmp_path,monkeypatch):
     assert cmd[cmd.index('--js-runtimes')+1]=='node'
     assert '--remote-components' in cmd
     assert cmd[cmd.index('--remote-components')+1]=='ejs:github'
+    assert '--socket-timeout' in cmd
+    assert '--retries' in cmd
+    has_curl_cffi=True
+    try:
+        import curl_cffi  # noqa: F401
+    except ImportError:
+        has_curl_cffi=False
+    assert ('--impersonate' in cmd)==has_curl_cffi
 
 def test_download_youtube_omits_js_runtime_when_none_available(tmp_path,monkeypatch):
     captured={}

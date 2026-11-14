@@ -6,3 +6,4 @@ openai>=1.50,<3
 Pillow>=10,<13
 pytesseract>=0.3.13,<1
 yt-dlp>=2025.1.15
+curl-cffi>=0.7
