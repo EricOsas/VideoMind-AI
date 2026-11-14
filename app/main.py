@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI,File,Form,HTTPException,UploadFile,BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from .config import JOBS,OUTPUTS,STATIC,MAX_UPLOAD_MB,FRAME_INTERVAL_SECONDS,FRAME_CHANGE_THRESHOLD,SCENE_CHANGE_THRESHOLD,MAX_VIDEO_MINUTES
 from . import media
 from .analyzer import extract_code_observations
@@ -54,7 +55,8 @@ async def analyze(background:BackgroundTasks,video:UploadFile|None=File(default=
  try:
   if youtube_url.strip():
    if not youtube_url.startswith(('https://www.youtube.com/','https://youtube.com/','https://youtu.be/')):raise HTTPException(400,'Enter a standard YouTube URL')
-   source=media.download_youtube(youtube_url.strip(),folder);captions=sorted(folder.glob('source*.vtt'));subtitle=captions[0] if captions else None
+   write_job(job_id,{'id':job_id,'status':'queued','stage':'Downloading video from YouTube','progress':2,'source':'youtube','start_time_seconds':start_time_seconds,'end_time_seconds':end_time_seconds})
+   source=await run_in_threadpool(media.download_youtube,youtube_url.strip(),folder);captions=sorted(folder.glob('source*.vtt'));subtitle=captions[0] if captions else None
   else:
    suffix=Path(video.filename).suffix.lower()
    if suffix not in media.VIDEO_EXTS:raise HTTPException(400,'Unsupported video type')
