@@ -30,7 +30,7 @@ def extract_frames(video:Path,out:Path,interval:int=1,start:float=0,end:float|No
  return [{'timestamp':start+i*interval,'label':format_time(start+i*interval),'path':str(p),'kind':'sample'} for i,p in enumerate(sorted(out.glob('frame-*.jpg')))]
 def extract_scene_frames(video:Path,out:Path,threshold:float=.25,start:float=0,end:float|None=None)->list[dict[str,Any]]:
  out.mkdir(parents=True,exist_ok=True)
- cmd=['ffmpeg','-hide_banner','-loglevel','info',*_range_args(start,end),'-i',str(video),'-vf',f"select='gt(scene,{threshold})',scale='min(1440,iw)':-2,showinfo",'-fps_mode','vfr',str(out/'scene-%08d.jpg'),'-y']
+ cmd=['ffmpeg','-hide_banner','-loglevel','info',*_range_args(start,end),'-i',str(video),'-vf',f"select='gt(scene,{threshold})',scale='min(1440,iw)':-2,showinfo,format=yuvj420p",'-fps_mode','vfr',str(out/'scene-%08d.jpg'),'-y']
  p=subprocess.run(cmd,capture_output=True,text=True,timeout=7200)
  if p.returncode: raise RuntimeError((p.stderr or p.stdout)[-2500:])
  pts=[float(x) for x in re.findall(r'pts_time:([0-9]+(?:\.[0-9]+)?)',p.stderr)]

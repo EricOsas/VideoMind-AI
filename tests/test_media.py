@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from pathlib import Path
+import shutil,subprocess
+import pytest
 from PIL import Image,ImageDraw
 from app import media
 from app.media import select_changed_frames
@@ -17,7 +20,9 @@ def test_focused_range_args_use_start_and_duration():
     assert media._range_args(0,None)==['-ss','0.000']
 
 def test_scene_detection_returns_video_timestamps(tmp_path,monkeypatch):
+    captured={}
     def fake_run(cmd,**kwargs):
+        captured['cmd']=cmd
         for i in range(2):
             Image.new('RGB',(32,32),'white').save(tmp_path/f'scene-{i+1:08d}.jpg')
         return SimpleNamespace(returncode=0,stdout='',stderr='pts_time:2.500\\npts_time:7.250\\n')
@@ -25,6 +30,16 @@ def test_scene_detection_returns_video_timestamps(tmp_path,monkeypatch):
     scenes=media.extract_scene_frames(tmp_path/'video.mp4',tmp_path,0.25,start=30,end=45)
     assert [x['timestamp'] for x in scenes]==[32.5,37.25]
     assert all(x['kind']=='scene_change' for x in scenes)
+    vf=captured['cmd'][captured['cmd'].index('-vf')+1]
+    assert 'format=yuvj420p' in vf
+
+@pytest.mark.skipif(not (shutil.which('ffmpeg') and shutil.which('ffprobe')),reason='ffmpeg not installed')
+def test_scene_detection_encodes_limited_range_av1_video(tmp_path):
+    video=tmp_path/'limited.mp4'
+    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc=size=320x240:rate=10:duration=2','-f','lavfi','-i','color=black:size=320x240:rate=10:duration=2','-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0,format=yuv420p','-color_range','tv','-c:v','libx264','-pix_fmt','yuv420p',str(video),'-y'],check=True)
+    scenes=media.extract_scene_frames(video,tmp_path/'scene',0.25,0,None)
+    assert len(scenes)>=1
+    assert all(Path(x['path']).exists() for x in scenes)
 
 def test_focused_range_filters_transcript_cues_without_rewriting_them():
     cues=[
