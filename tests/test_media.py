@@ -15,6 +15,32 @@ def test_visual_difference_retains_changed_frame(tmp_path):
     chosen=select_changed_frames(frames,1.5)
     assert chosen[0]['timestamp']==0 and chosen[-1]['timestamp']==2
 
+def test_download_youtube_enables_available_js_runtime(tmp_path,monkeypatch):
+    captured={}
+    def fake_run(cmd,timeout=0):
+        captured['cmd']=cmd
+        (tmp_path/'source.mp4').write_bytes(b'x')
+        return ''
+    monkeypatch.setattr(media,'run',fake_run)
+    monkeypatch.setattr(media.shutil,'which',lambda name: 'C:/node/node.exe' if name=='node' else None)
+    media.download_youtube('https://youtu.be/bJTnI0tWi5k',tmp_path)
+    cmd=captured['cmd']
+    assert '--js-runtimes' in cmd
+    assert cmd[cmd.index('--js-runtimes')+1]=='node'
+    assert '--remote-components' in cmd
+    assert cmd[cmd.index('--remote-components')+1]=='ejs:github'
+
+def test_download_youtube_omits_js_runtime_when_none_available(tmp_path,monkeypatch):
+    captured={}
+    def fake_run(cmd,timeout=0):
+        captured['cmd']=cmd
+        (tmp_path/'source.mp4').write_bytes(b'x')
+        return ''
+    monkeypatch.setattr(media,'run',fake_run)
+    monkeypatch.setattr(media.shutil,'which',lambda name: None)
+    media.download_youtube('https://youtu.be/bJTnI0tWi5k',tmp_path)
+    assert '--js-runtimes' not in captured['cmd']
+
 def test_focused_range_args_use_start_and_duration():
     assert media._range_args(30,43)==['-ss','30.000','-t','13.000']
     assert media._range_args(0,None)==['-ss','0.000']

@@ -13,7 +13,9 @@ def probe(path:Path)->dict[str,Any]:
  d=json.loads(run(['ffprobe','-v','error','-show_entries','format=duration:stream=codec_type,width,height','-of','json',str(path)])); v=next((x for x in d.get('streams',[]) if x.get('codec_type')=='video'),{})
  return {'duration':float(d.get('format',{}).get('duration',0)),'width':v.get('width'),'height':v.get('height')}
 def download_youtube(url:str,target:Path)->Path:
- run(['yt-dlp','--no-playlist','--restrict-filenames','--write-subs','--write-auto-subs','--sub-langs','en.*,en','--sub-format','vtt/best','--convert-subs','vtt','-f','bv*+ba/b','--merge-output-format','mp4','-o',str(target/'source.%(ext)s'),url],7200)
+ runtime=next((x for x in ('node','deno','bun') if shutil.which(x)),None)
+ js_args=['--js-runtimes',runtime,'--remote-components','ejs:github'] if runtime else []
+ run(['yt-dlp','--no-playlist','--restrict-filenames',*js_args,'--write-subs','--write-auto-subs','--sub-langs','en.*,en','--sub-format','vtt/best','--convert-subs','vtt','-f','bv*+ba/b','--merge-output-format','mp4','-o',str(target/'source.%(ext)s'),url],7200)
  found=[p for p in target.glob('source.*') if p.suffix.lower() in VIDEO_EXTS]
  if not found: raise RuntimeError('No supported video downloaded.')
  return max(found,key=lambda p:p.stat().st_size)
