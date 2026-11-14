@@ -29,7 +29,7 @@ def process_job(job_id,video_path,subtitle_path,start_time,end_time):
   changed=media.select_changed_frames(frames_all+scene_frames,FRAME_CHANGE_THRESHOLD)
   frames_by_path={f['path']:f for f in changed+scene_frames};frames=sorted(frames_by_path.values(),key=lambda f:float(f['timestamp']))
   if not frames:raise RuntimeError('No frames could be extracted from the selected time range')
-  data.update(stage='Running local Tesseract OCR',progress=25,frame_count=len(frames),scene_change_count=len(scene_frames));write_job(job_id,data);ocr=media.run_local_ocr(frames);transcript=media.parse_vtt(subtitle_path) if subtitle_path else []
+  data.update(stage='Running local Tesseract OCR',progress=25,frame_count=len(frames),scene_change_count=len(scene_frames));write_job(job_id,data);ocr=media.run_local_ocr(frames);transcript=media.filter_transcript_range(media.parse_vtt(subtitle_path),start_time,actual_end) if subtitle_path else []
   data.update(stage=f'Sending {len(frames)} visual checkpoints to Coarena',progress=35,transcript_count=len(transcript));write_job(job_id,data);observations,model=extract_code_observations(frames,transcript,ocr)
   data.update(stage='Reconstructing source files and reports',progress=82,observation_count=len(observations));write_job(job_id,data);result=reconstruct(observations)
   if not result['files']:raise RuntimeError('No readable numbered source code detected. Use a clearer video with visible line numbers.')
