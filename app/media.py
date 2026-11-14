@@ -78,3 +78,6 @@ def parse_vtt(path:Path)->list[dict[str,Any]]:
   body=re.sub(r'<[^>]+>',' ',' '.join(lines[lines.index(t)+1:])).strip()
   if body:out.append({'start':start,'end':end,'text':body})
  return out
+
+def filter_transcript_range(cues:list[dict[str,Any]],start:float,end:float)->list[dict[str,Any]]:
+ return [cue for cue in cues if float(cue.get('end',0))>=start and float(cue.get('start',0))<=end]
