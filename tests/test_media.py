@@ -25,3 +25,12 @@ def test_scene_detection_returns_video_timestamps(tmp_path,monkeypatch):
     scenes=media.extract_scene_frames(tmp_path/'video.mp4',tmp_path,0.25,start=30,end=45)
     assert [x['timestamp'] for x in scenes]==[32.5,37.25]
     assert all(x['kind']=='scene_change' for x in scenes)
+
+def test_focused_range_filters_transcript_cues_without_rewriting_them():
+    cues=[
+        {'start':1.0,'end':4.0,'text':'before'},
+        {'start':29.0,'end':32.0,'text':'overlap start'},
+        {'start':35.0,'end':38.0,'text':'inside'},
+        {'start':44.0,'end':46.0,'text':'after'},
+    ]
+    assert media.filter_transcript_range(cues,30,43)==cues[1:3]
