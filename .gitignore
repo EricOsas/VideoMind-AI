@@ -8,3 +8,5 @@ data/jobs/*
 !data/jobs/.gitkeep
 data/outputs/*
 !data/outputs/.gitkeep
+
+.env.bak-*
