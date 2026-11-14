@@ -19,19 +19,35 @@ def download_youtube(url:str,target:Path)->Path:
  return max(found,key=lambda p:p.stat().st_size)
 def format_time(s:float)->str:
  n=max(0,int(s)); return f'{n//3600:02d}:{n%3600//60:02d}:{n%60:02d}'
-def extract_frames(video:Path,out:Path,interval:int=1)->list[dict[str,Any]]:
- out.mkdir(parents=True,exist_ok=True); run(['ffmpeg','-hide_banner','-loglevel','error','-i',str(video),'-vf',f"fps=1/{interval},scale='min(1440,iw)':-2",'-q:v','3','-vsync','0',str(out/'frame-%08d.jpg'),'-y'])
- return [{'timestamp':i*interval,'label':format_time(i*interval),'path':str(p)} for i,p in enumerate(sorted(out.glob('frame-*.jpg')))]
+def _range_args(start:float,end:float|None)->list[str]:
+ args=['-ss',f'{start:.3f}']
+ if end is not None: args+=['-t',f'{end-start:.3f}']
+ return args
+def extract_frames(video:Path,out:Path,interval:int=1,start:float=0,end:float|None=None)->list[dict[str,Any]]:
+ out.mkdir(parents=True,exist_ok=True)
+ cmd=['ffmpeg','-hide_banner','-loglevel','error',*_range_args(start,end),'-i',str(video),'-vf',f"fps=1/{interval},scale='min(1440,iw)':-2",'-q:v','3','-fps_mode','vfr',str(out/'frame-%08d.jpg'),'-y']
+ run(cmd)
+ return [{'timestamp':start+i*interval,'label':format_time(start+i*interval),'path':str(p),'kind':'sample'} for i,p in enumerate(sorted(out.glob('frame-*.jpg')))]
+def extract_scene_frames(video:Path,out:Path,threshold:float=.25,start:float=0,end:float|None=None)->list[dict[str,Any]]:
+ out.mkdir(parents=True,exist_ok=True)
+ cmd=['ffmpeg','-hide_banner','-loglevel','info',*_range_args(start,end),'-i',str(video),'-vf',f"select='gt(scene,{threshold})',scale='min(1440,iw)':-2,showinfo",'-fps_mode','vfr',str(out/'scene-%08d.jpg'),'-y']
+ p=subprocess.run(cmd,capture_output=True,text=True,timeout=7200)
+ if p.returncode: raise RuntimeError((p.stderr or p.stdout)[-2500:])
+ pts=[float(x) for x in re.findall(r'pts_time:([0-9]+(?:\.[0-9]+)?)',p.stderr)]
+ files=sorted(out.glob('scene-*.jpg'))
+ return [{'timestamp':start+(pts[i] if i<len(pts) else 0),'label':format_time(start+(pts[i] if i<len(pts) else 0)),'path':str(f),'kind':'scene_change','scene_threshold':threshold} for i,f in enumerate(files)]
 def select_changed_frames(frames:list[dict[str,Any]],threshold:float=1.5)->list[dict[str,Any]]:
  if len(frames)<=2:return frames
  from PIL import Image,ImageChops,ImageStat,ImageFilter
  def sig(p):
   with Image.open(p) as im:
    g=im.convert('L').resize((480,270)); return g.copy(),g.filter(ImageFilter.FIND_EDGES).copy()
+ frames=sorted(frames,key=lambda x:(float(x['timestamp']),x.get('kind')!='scene_change'))
  keep=[frames[0]]; pg,pe=sig(frames[0]['path'])
  for f in frames[1:-1]:
   cg,ce=sig(f['path']); px=ImageStat.Stat(ImageChops.difference(pg,cg)).mean[0]; ed=ImageStat.Stat(ImageChops.difference(pe,ce)).mean[0]; score=.65*px+.35*ed
-  if score>=threshold:keep.append({**f,'difference_score':round(score,3)});pg,pe=cg,ce
+  if score>=threshold:
+   keep.append({**f,'difference_score':round(score,3)});pg,pe=cg,ce
  if keep[-1]['path']!=frames[-1]['path']:keep.append(frames[-1])
  return keep
 def run_local_ocr(frames:list[dict[str,Any]])->list[dict[str,Any]]:
